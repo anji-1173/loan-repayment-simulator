@@ -109,6 +109,7 @@
     monthEl.addEventListener('input', updateRateChangeHints);
     node.querySelector('.rc-remove').addEventListener('click', function () {
       node.remove();
+      saveState();
     });
     rateChangeList.appendChild(node);
     updateRateChangeHints();
@@ -220,7 +221,7 @@
         { label: '支払額' },
         { label: 'うち元金', only: 'wide' },
         { label: 'うち利息', only: 'wide' },
-        { label: '元金／利息', only: 'narrow' }
+        { label: '元金', sub: '利息', only: 'narrow' }
       ],
       body: periods.map(function (p) {
         return {
@@ -242,9 +243,9 @@
     return form.ownerDocument.querySelector('input[name="view"]:checked').value;
   }
 
-  // 元金・利息を1セルに2段で表示（スマホ用）
+  // 元金・利息を1セルに2段で表示（スマホ用。見出しも「元金／利息」の2段）
   function breakdown(principal, interest) {
-    return { lines: ['元 ' + yenFmt.format(principal), '利 ' + yenFmt.format(interest)] };
+    return { lines: [yenFmt.format(principal), yenFmt.format(interest)] };
   }
 
   /**
@@ -268,7 +269,7 @@
           { label: '支払額' },
           { label: '元金', only: 'wide' },
           { label: '利息', only: 'wide' },
-          { label: '元金／利息', only: 'narrow' },
+          { label: '元金', sub: '利息', only: 'narrow' },
           { label: '年末残高' }
         ],
         body: Loan.summarizeByYear(rows).map(function (y) {
@@ -292,7 +293,7 @@
         { label: '返済額' },
         { label: '元金', only: 'wide' },
         { label: '利息', only: 'wide' },
-        { label: '元金／利息', only: 'narrow' },
+        { label: '元金', sub: '利息', only: 'narrow' },
         { label: '残高' }
       ]);
     return {
@@ -417,6 +418,50 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  // ---- 入力内容の保存・復元（この端末のブラウザ内に保存） ----
+  var STORAGE_KEY = 'loan-repayment-simulator:v1';
+
+  function saveState() {
+    var state = {
+      principal: principalInput.value,
+      years: yearsInput.value,
+      extraMonths: extraMonthsInput.value,
+      baseRate: baseRateInput.value,
+      method: form.method.value,
+      startMonth: startMonthInput.value,
+      rateChanges: Array.prototype.map.call(rateChangeList.querySelectorAll('.rate-change'), function (li) {
+        return { month: li.querySelector('.rc-month').value, rate: li.querySelector('.rc-rate').value };
+      }),
+      view: currentView(),
+      calculated: !!lastResult && !$('result').hidden
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* 保存できない環境では何もしない */ }
+  }
+
+  function loadState() {
+    var state = null;
+    try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { state = null; }
+    if (!state || typeof state !== 'object') return null;
+    if (typeof state.principal === 'string') principalInput.value = state.principal;
+    if (typeof state.years === 'string') yearsInput.value = state.years;
+    if (typeof state.extraMonths === 'string') extraMonthsInput.value = state.extraMonths;
+    if (typeof state.baseRate === 'string') baseRateInput.value = state.baseRate;
+    if (typeof state.startMonth === 'string') startMonthInput.value = state.startMonth;
+    form.querySelectorAll('input[name="method"]').forEach(function (r) { r.checked = r.value === state.method; });
+    if (!form.method.value) form.method.value = 'equal-payment';
+    document.querySelectorAll('input[name="view"]').forEach(function (r) { r.checked = r.value === state.view; });
+    if (!document.querySelector('input[name="view"]:checked')) document.querySelector('input[name="view"][value="monthly"]').checked = true;
+    (Array.isArray(state.rateChanges) ? state.rateChanges : []).forEach(function (c) {
+      if (c && typeof c === 'object') addRateChange(String(c.month || ''), String(c.rate || ''));
+    });
+    return state;
+  }
+
+  function resetState() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* 何もしない */ }
+    location.reload();
+  }
+
   // ---- イベント ----
   principalInput.addEventListener('input', updatePrincipalHint);
   principalInput.addEventListener('blur', function () {
@@ -428,6 +473,7 @@
     b.addEventListener('click', function () {
       principalInput.value = yenFmt.format(Number(b.dataset.amount));
       updatePrincipalHint();
+      saveState();
     });
   });
   yearsInput.addEventListener('input', updateTermHint);
@@ -448,18 +494,33 @@
     if (n && next > n) next = Math.max(2, n);
     var node = addRateChange(next, Math.round((lastRate + 0.5) * 1000) / 1000);
     node.querySelector('.rc-rate').focus();
+    saveState();
   });
   document.querySelectorAll('input[name="view"]').forEach(function (r) {
-    r.addEventListener('change', renderSchedule);
+    r.addEventListener('change', function () {
+      renderSchedule();
+      saveState();
+    });
+  });
+  // 入力のたびに保存（金利変更の行も含む）
+  form.addEventListener('input', saveState);
+  form.addEventListener('change', saveState);
+  $('reset-inputs').addEventListener('click', function () {
+    if (confirm('入力内容を初期状態に戻します。よろしいですか？')) resetState();
   });
   $('download-csv').addEventListener('click', downloadCsv);
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    if (calculate()) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var ok = calculate();
+    saveState();
+    if (ok) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
+  var saved = loadState();
   updatePrincipalHint();
   updateTermHint();
   updateMethodHint();
+  // 前回計算していた場合は、開いた時点で結果も表示する
+  if (saved && saved.calculated) calculate();
 })();
