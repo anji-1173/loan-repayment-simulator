@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <meta name="apple-mobile-web-app-title" content="返済シミュ">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <header class="site-header">
@@ -91,9 +91,11 @@
 
       <div id="errors" class="errors" role="alert" hidden></div>
 
-      <button type="submit" class="primary">計算する</button>
-      <p class="form-note">入力内容はこの端末に保存され、次に開いたときも表示されます。
-        <button type="button" id="reset-inputs" class="link">入力をリセット</button></p>
+      <div class="form-actions">
+        <button type="button" id="clear-inputs" class="secondary">クリア</button>
+        <button type="submit" class="primary">計算する</button>
+      </div>
+      <p class="form-note">入力内容はこの端末に保存され、次に開いたときも表示されます。</p>
     </form>
 
     <section id="result" class="result" hidden aria-live="polite">
@@ -170,7 +172,7 @@
     </li>
   </template>
 
-  <script src="loan.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="loan.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

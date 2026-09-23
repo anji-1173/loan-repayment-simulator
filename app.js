@@ -492,9 +492,23 @@
     return state;
   }
 
-  function resetState() {
-    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* 何もしない */ }
-    location.reload();
+  // 入力した条件をすべて空にする（保存した一覧はそのまま）
+  function clearInputs() {
+    applyFormState({
+      principal: '', years: '', extraMonths: '', baseRate: '',
+      method: 'equal-payment', startMonth: '', rateChanges: []
+    });
+    showErrors([]);
+    lastResult = null;
+    $('result').hidden = true;
+    $('save-msg').textContent = '';
+    if (activeSavedId) {
+      activeSavedId = null;
+      renderSavedList();
+    }
+    saveState();
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    principalInput.focus({ preventScroll: true });
   }
 
   // ---- シミュレーションの保存（保存1、保存2…） ----
@@ -730,8 +744,8 @@
   $('save-name').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); saveSimulation(); }
   });
-  $('reset-inputs').addEventListener('click', function () {
-    if (confirm('入力内容を初期状態に戻します。よろしいですか？')) resetState();
+  $('clear-inputs').addEventListener('click', function () {
+    if (confirm('入力した条件をすべてクリアします。よろしいですか？\n（保存したシミュレーションは消えません）')) clearInputs();
   });
   $('download-csv').addEventListener('click', downloadCsv);
 
