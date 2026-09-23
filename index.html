@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>返済シミュレーション</title>
+  <meta name="description" content="元利均等・元金均等、変動金利（途中の金利変更）に対応したローン返済シミュレーター">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>返済シミュレーション</h1>
+    <p class="lead">元利均等・元金均等／途中の金利変更（変動金利）に対応</p>
+  </header>
+
+  <main>
+    <form id="loan-form" class="card" novalidate>
+      <h2>条件</h2>
+
+      <div class="field">
+        <label for="principal">借入額</label>
+        <div class="input-unit">
+          <input id="principal" name="principal" type="text" inputmode="numeric" autocomplete="off" value="30,000,000">
+          <span class="unit">円</span>
+        </div>
+        <p class="hint" id="principal-hint"></p>
+        <div class="presets" aria-label="借入額のプリセット">
+          <button type="button" data-amount="10000000">1,000万</button>
+          <button type="button" data-amount="30000000">3,000万</button>
+          <button type="button" data-amount="50000000">5,000万</button>
+          <button type="button" data-amount="100000000">1億</button>
+          <button type="button" data-amount="1000000000">10億</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">返済期間</span>
+        <div class="row">
+          <div class="input-unit">
+            <input id="years" name="years" type="number" min="0" max="50" step="1" value="35">
+            <span class="unit">年</span>
+          </div>
+          <div class="input-unit">
+            <input id="extra-months" name="extraMonths" type="number" min="0" max="11" step="1" value="0">
+            <span class="unit">ヶ月</span>
+          </div>
+        </div>
+        <p class="hint" id="term-hint"></p>
+      </div>
+
+      <div class="field">
+        <label for="base-rate">当初金利（年利）</label>
+        <div class="input-unit">
+          <input id="base-rate" name="baseRate" type="number" min="0" max="30" step="0.001" value="0.5">
+          <span class="unit">%</span>
+        </div>
+      </div>
+
+      <fieldset class="field">
+        <legend>返済方法</legend>
+        <div class="segmented">
+          <label><input type="radio" name="method" value="equal-payment" checked><span>元利均等返済</span></label>
+          <label><input type="radio" name="method" value="equal-principal"><span>元金均等返済</span></label>
+        </div>
+        <p class="hint" id="method-hint"></p>
+      </fieldset>
+
+      <div class="field">
+        <label for="start-month">返済開始年月（任意）</label>
+        <input id="start-month" name="startMonth" type="month">
+        <p class="hint">入力すると返済表に年月が表示されます。</p>
+      </div>
+
+      <fieldset class="field">
+        <legend>金利変更（変動金利）</legend>
+        <p class="hint">指定した回の返済から金利が変わります。元利均等返済では、その時点の残高・残り回数で毎月の返済額を再計算します。</p>
+        <ol id="rate-changes" class="rate-changes"></ol>
+        <button type="button" id="add-rate-change" class="secondary">＋ 金利変更を追加</button>
+      </fieldset>
+
+      <div id="errors" class="errors" role="alert" hidden></div>
+
+      <button type="submit" class="primary">計算する</button>
+    </form>
+
+    <section id="result" class="result" hidden aria-live="polite">
+      <div class="card">
+        <h2>結果</h2>
+        <div class="summary">
+          <div class="stat">
+            <span class="stat-label" id="first-payment-label">毎月の返済額（初回）</span>
+            <span class="stat-value" id="first-payment"></span>
+            <span class="stat-sub" id="first-payment-breakdown"></span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">総支払額</span>
+            <span class="stat-value" id="total-payment"></span>
+            <span class="stat-sub" id="total-breakdown"></span>
+          </div>
+        </div>
+        <div class="ratio" aria-hidden="true">
+          <div class="ratio-principal" id="ratio-principal"></div>
+          <div class="ratio-interest" id="ratio-interest"></div>
+        </div>
+        <div class="ratio-legend">
+          <span><i class="dot principal"></i>元金 <b id="ratio-principal-text"></b></span>
+          <span><i class="dot interest"></i>利息 <b id="ratio-interest-text"></b></span>
+        </div>
+        <div id="periods" class="periods"></div>
+      </div>
+
+      <div class="card">
+        <div class="table-head">
+          <h2>返済予定表</h2>
+          <div class="table-actions">
+            <div class="segmented small" role="tablist">
+              <label><input type="radio" name="view" value="monthly" checked><span>月別</span></label>
+              <label><input type="radio" name="view" value="yearly"><span>年別</span></label>
+            </div>
+            <button type="button" id="download-csv" class="secondary">CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="schedule">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>利息は「残高 × 年利 ÷ 12」を1円未満切り捨てで計算しています。実際の返済額は金融機関の計算方法（端数処理、5年ルール・125%ルール等）により異なる場合があります。</p>
+  </footer>
+
+  <template id="rate-change-template">
+    <li class="rate-change">
+      <div class="input-unit">
+        <input type="number" class="rc-month" min="2" step="1" aria-label="変更する回">
+        <span class="unit">回目から</span>
+      </div>
+      <div class="input-unit">
+        <input type="number" class="rc-rate" min="0" max="30" step="0.001" aria-label="変更後の金利">
+        <span class="unit">%</span>
+      </div>
+      <span class="rc-when hint"></span>
+      <button type="button" class="rc-remove" aria-label="この金利変更を削除">×</button>
+    </li>
+  </template>
+
+  <script src="loan.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
