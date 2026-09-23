@@ -2,6 +2,8 @@
 
 ローンの返済額をシミュレーションする Web アプリです。ビルド不要の静的サイト（HTML / CSS / JavaScript）なので、`index.html` をブラウザで開くだけで動きます。
 
+**アプリ：https://anji-1173.github.io/loan-repayment-simulator/**
+
 ## できること
 
 - **借入額**：1円〜100億円（10億円クラスもそのまま計算）
