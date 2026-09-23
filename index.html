@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <meta name="apple-mobile-web-app-title" content="返済シミュ">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <header class="site-header">
@@ -19,6 +19,12 @@
   </header>
 
   <main>
+    <section id="saved-section" class="card saved" hidden>
+      <h2>保存したシミュレーション</h2>
+      <p class="hint">タップすると、その条件で計算結果を表示します。</p>
+      <ul id="saved-list" class="saved-list"></ul>
+    </section>
+
     <form id="loan-form" class="card" novalidate>
       <h2>条件</h2>
 
@@ -113,6 +119,14 @@
           <span><i class="dot principal"></i>元金 <b id="ratio-principal-text"></b></span>
           <span><i class="dot interest"></i>利息 <b id="ratio-interest-text"></b></span>
         </div>
+        <div class="save-box">
+          <label for="save-name">この条件を保存</label>
+          <div class="save-row">
+            <input id="save-name" type="text" maxlength="30" autocomplete="off" placeholder="保存1">
+            <button type="button" id="save-sim" class="secondary">保存</button>
+          </div>
+          <p class="hint" id="save-msg" role="status"></p>
+        </div>
         <div id="periods" class="periods"></div>
       </div>
 
@@ -156,7 +170,7 @@
     </li>
   </template>
 
-  <script src="loan.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="loan.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

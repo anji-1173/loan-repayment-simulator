@@ -420,9 +420,18 @@
 
   // ---- 入力内容の保存・復元（この端末のブラウザ内に保存） ----
   var STORAGE_KEY = 'loan-repayment-simulator:v1';
+  var SAVED_KEY = 'loan-repayment-simulator:saved:v1';
 
-  function saveState() {
-    var state = {
+  function storageGet(key) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
+  }
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+  }
+
+  // フォームの入力内容（入力欄の文字列のまま）
+  function getFormState() {
+    return {
       principal: principalInput.value,
       years: yearsInput.value,
       extraMonths: extraMonthsInput.value,
@@ -431,35 +440,240 @@
       startMonth: startMonthInput.value,
       rateChanges: Array.prototype.map.call(rateChangeList.querySelectorAll('.rate-change'), function (li) {
         return { month: li.querySelector('.rc-month').value, rate: li.querySelector('.rc-rate').value };
-      }),
-      view: currentView(),
-      calculated: !!lastResult && !$('result').hidden
+      })
     };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* 保存できない環境では何もしない */ }
   }
 
-  function loadState() {
-    var state = null;
-    try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { state = null; }
-    if (!state || typeof state !== 'object') return null;
+  function applyFormState(state) {
     if (typeof state.principal === 'string') principalInput.value = state.principal;
     if (typeof state.years === 'string') yearsInput.value = state.years;
     if (typeof state.extraMonths === 'string') extraMonthsInput.value = state.extraMonths;
     if (typeof state.baseRate === 'string') baseRateInput.value = state.baseRate;
-    if (typeof state.startMonth === 'string') startMonthInput.value = state.startMonth;
+    startMonthInput.value = typeof state.startMonth === 'string' ? state.startMonth : '';
     form.querySelectorAll('input[name="method"]').forEach(function (r) { r.checked = r.value === state.method; });
     if (!form.method.value) form.method.value = 'equal-payment';
-    document.querySelectorAll('input[name="view"]').forEach(function (r) { r.checked = r.value === state.view; });
-    if (!document.querySelector('input[name="view"]:checked')) document.querySelector('input[name="view"][value="monthly"]').checked = true;
+    rateChangeList.innerHTML = '';
     (Array.isArray(state.rateChanges) ? state.rateChanges : []).forEach(function (c) {
       if (c && typeof c === 'object') addRateChange(String(c.month || ''), String(c.rate || ''));
     });
+    updatePrincipalHint();
+    updateTermHint();
+    updateMethodHint();
+  }
+
+  // 保存されている入力内容（文字列）を計算条件に変換
+  function stateToInput(state) {
+    return {
+      principal: parseYen(state.principal),
+      months: (parseInt(state.years, 10) || 0) * 12 + (parseInt(state.extraMonths, 10) || 0),
+      baseRate: parseNum(state.baseRate),
+      method: state.method,
+      rateChanges: (state.rateChanges || []).map(function (c) {
+        return { month: parseNum(c.month), rate: parseNum(c.rate) };
+      })
+    };
+  }
+
+  function saveState() {
+    var state = getFormState();
+    state.view = currentView();
+    state.calculated = !!lastResult && !$('result').hidden;
+    state.activeSavedId = activeSavedId;
+    storageSet(STORAGE_KEY, state);
+  }
+
+  function loadState() {
+    var state = storageGet(STORAGE_KEY);
+    if (!state || typeof state !== 'object') return null;
+    applyFormState(state);
+    document.querySelectorAll('input[name="view"]').forEach(function (r) { r.checked = r.value === state.view; });
+    if (!document.querySelector('input[name="view"]:checked')) document.querySelector('input[name="view"][value="monthly"]').checked = true;
+    activeSavedId = typeof state.activeSavedId === 'string' ? state.activeSavedId : null;
     return state;
   }
 
   function resetState() {
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* 何もしない */ }
     location.reload();
+  }
+
+  // ---- シミュレーションの保存（保存1、保存2…） ----
+  var activeSavedId = null;
+
+  function loadSavedList() {
+    var list = storageGet(SAVED_KEY);
+    return Array.isArray(list) ? list.filter(function (x) { return x && x.id && x.state; }) : [];
+  }
+
+  function nextSaveName(list) {
+    var max = 0;
+    list.forEach(function (x) {
+      var m = /^保存(\d+)$/.exec(x.name || '');
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return '保存' + Math.max(max + 1, list.length + 1);
+  }
+
+  function termLabel(months) {
+    var y = Math.floor(months / 12);
+    var m = months % 12;
+    return (y ? y + '年' : '') + (m ? m + 'ヶ月' : '');
+  }
+
+  function savedDateLabel(ts) {
+    var d = new Date(ts);
+    if (isNaN(d)) return '';
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  // 保存した条件の概要（条件・金利・結果）
+  function savedSummary(state) {
+    var input = stateToInput(state);
+    var lines = { cond: '', rate: '', result: [] };
+    if (Loan.validate(input).length) {
+      lines.cond = '条件に誤りがあります';
+      return lines;
+    }
+    lines.cond = yenKanji(input.principal) + '・' + termLabel(input.months) + '・' +
+      (input.method === 'equal-payment' ? '元利均等' : '元金均等');
+    var changes = input.rateChanges.slice().sort(function (a, b) { return a.month - b.month; });
+    lines.rate = '金利 ' + pct(input.baseRate) + (changes.length
+      ? changes.map(function (c) { return ' → ' + c.month + '回目〜' + pct(c.rate); }).join('')
+      : '（変更なし）');
+    var r = Loan.simulate(input);
+    // 金額の途中で改行されないよう、まとまりごとに分けて表示する
+    lines.result = [
+      '毎月 ' + yen(r.rows[0].payment) + '（初回）',
+      '総支払額 ' + yenKanji(r.totals.payment),
+      'うち利息 ' + yenKanji(r.totals.interest)
+    ];
+    return lines;
+  }
+
+  function renderSavedList() {
+    var list = loadSavedList();
+    var ul = $('saved-list');
+    ul.innerHTML = '';
+    $('saved-section').hidden = list.length === 0;
+    list.forEach(function (item) {
+      var sum = savedSummary(item.state);
+      var li = document.createElement('li');
+      li.className = 'saved-item' + (item.id === activeSavedId ? ' active' : '');
+
+      var open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'saved-open';
+      var head = document.createElement('span');
+      head.className = 'saved-head';
+      var name = document.createElement('span');
+      name.className = 'saved-name';
+      name.textContent = item.name;
+      var date = document.createElement('span');
+      date.className = 'saved-date';
+      date.textContent = savedDateLabel(item.savedAt);
+      head.appendChild(name);
+      head.appendChild(date);
+      open.appendChild(head);
+      [['saved-cond', sum.cond], ['saved-rate', sum.rate]].forEach(function (p) {
+        if (!p[1]) return;
+        var span = document.createElement('span');
+        span.className = p[0];
+        span.textContent = p[1];
+        open.appendChild(span);
+      });
+      if (sum.result.length) {
+        var result = document.createElement('span');
+        result.className = 'saved-result';
+        sum.result.forEach(function (text) {
+          var chunk = document.createElement('span');
+          chunk.textContent = text;
+          result.appendChild(chunk);
+        });
+        open.appendChild(result);
+      }
+      open.addEventListener('click', function () { openSaved(item.id); });
+
+      var actions = document.createElement('div');
+      actions.className = 'saved-actions';
+      var rename = document.createElement('button');
+      rename.type = 'button';
+      rename.className = 'link';
+      rename.textContent = '名前を変更';
+      rename.addEventListener('click', function () { renameSaved(item.id); });
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'link danger';
+      del.textContent = '削除';
+      del.addEventListener('click', function () { deleteSaved(item.id); });
+      actions.appendChild(rename);
+      actions.appendChild(del);
+
+      li.appendChild(open);
+      li.appendChild(actions);
+      ul.appendChild(li);
+    });
+    $('save-name').placeholder = nextSaveName(list);
+  }
+
+  function saveSimulation() {
+    var msg = $('save-msg');
+    // 保存するのは「今の入力内容」なので、計算し直してから保存する
+    if (!calculate()) {
+      msg.textContent = '入力内容に誤りがあるため保存できません。';
+      return;
+    }
+    var list = loadSavedList();
+    var name = $('save-name').value.trim() || nextSaveName(list);
+    var item = {
+      id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: name.slice(0, 30),
+      savedAt: Date.now(),
+      state: getFormState()
+    };
+    list.unshift(item);
+    if (!storageSet(SAVED_KEY, list)) {
+      msg.textContent = 'この端末では保存できませんでした（プライベートブラウズ等）。';
+      return;
+    }
+    activeSavedId = item.id;
+    $('save-name').value = '';
+    msg.textContent = '「' + item.name + '」として保存しました。画面上部の一覧から開けます。';
+    renderSavedList();
+    saveState();
+  }
+
+  function openSaved(id) {
+    var item = loadSavedList().filter(function (x) { return x.id === id; })[0];
+    if (!item) return;
+    applyFormState(item.state);
+    activeSavedId = id;
+    $('save-msg').textContent = '';
+    calculate();
+    renderSavedList();
+    saveState();
+    if (!$('result').hidden) $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renameSaved(id) {
+    var list = loadSavedList();
+    var item = list.filter(function (x) { return x.id === id; })[0];
+    if (!item) return;
+    var name = prompt('新しい名前を入力してください', item.name);
+    if (name === null || !name.trim()) return;
+    item.name = name.trim().slice(0, 30);
+    storageSet(SAVED_KEY, list);
+    renderSavedList();
+  }
+
+  function deleteSaved(id) {
+    var list = loadSavedList();
+    var item = list.filter(function (x) { return x.id === id; })[0];
+    if (!item || !confirm('「' + item.name + '」を削除します。よろしいですか？')) return;
+    storageSet(SAVED_KEY, list.filter(function (x) { return x.id !== id; }));
+    if (activeSavedId === id) activeSavedId = null;
+    renderSavedList();
+    saveState();
   }
 
   // ---- イベント ----
@@ -502,9 +716,20 @@
       saveState();
     });
   });
-  // 入力のたびに保存（金利変更の行も含む）
-  form.addEventListener('input', saveState);
-  form.addEventListener('change', saveState);
+  // 入力のたびに保存（金利変更の行も含む）。入力を変えたら「開いている保存」の強調は外す
+  function onFormEdited() {
+    if (activeSavedId) {
+      activeSavedId = null;
+      renderSavedList();
+    }
+    saveState();
+  }
+  form.addEventListener('input', onFormEdited);
+  form.addEventListener('change', onFormEdited);
+  $('save-sim').addEventListener('click', saveSimulation);
+  $('save-name').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); saveSimulation(); }
+  });
   $('reset-inputs').addEventListener('click', function () {
     if (confirm('入力内容を初期状態に戻します。よろしいですか？')) resetState();
   });
@@ -521,6 +746,7 @@
   updatePrincipalHint();
   updateTermHint();
   updateMethodHint();
+  renderSavedList();
   // 前回計算していた場合は、開いた時点で結果も表示する
   if (saved && saved.calculated) calculate();
 })();

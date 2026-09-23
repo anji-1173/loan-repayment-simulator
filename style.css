@@ -167,6 +167,33 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent); tex
 .dot.interest { background: var(--interest); }
 
 .periods { margin-top: 16px; }
+
+/* シミュレーションの保存 */
+.save-box { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.save-box label { display: block; font-weight: 600; margin-bottom: 6px; }
+.save-row { display: flex; gap: 8px; }
+.save-row input { flex: 1 1 auto; }
+.save-row button { flex: none; font-weight: 700; padding: 8px 18px; }
+button.link.danger { color: var(--error-text); }
+
+.saved-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.saved-item { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.saved-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.saved-open {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; text-align: left; border: 0; border-radius: 0;
+  padding: 10px 12px; background: var(--surface);
+}
+.saved-open:hover { background: var(--row-alt); }
+.saved-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.saved-name { font-weight: 700; font-size: 1.02rem; }
+.saved-date { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.saved-cond { font-size: 0.9rem; }
+.saved-rate { font-size: 0.82rem; color: var(--muted); }
+.saved-result { display: flex; flex-wrap: wrap; column-gap: 12px; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.saved-result > span { white-space: nowrap; }
+.saved-result > span:first-child { font-weight: 700; flex-basis: 100%; }
+.saved-actions { display: flex; justify-content: flex-end; gap: 16px; padding: 6px 12px; border-top: 1px dashed var(--border); font-size: 0.85rem; }
 .periods table { width: 100%; }
 
 .table-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -214,7 +241,7 @@ tr.rate-changed .sub:last-child { color: var(--interest); font-weight: 700; }
   .segmented span { padding: 8px 12px; }
   /* 結果カードは左右の余白を詰めて表の幅を確保 */
   .result .card { padding-left: 0; padding-right: 0; }
-  .result .card > h2, .result .card h3, .result .summary, .result .ratio, .result .ratio-legend, .result .table-head { margin-left: 16px; margin-right: 16px; }
+  .result .card > h2, .result .card h3, .result .summary, .result .ratio, .result .ratio-legend, .result .table-head, .result .save-box { margin-left: 16px; margin-right: 16px; }
   /* 表はカードの端まで広げる */
   .result .table-wrap { border-left: 0; border-right: 0; border-radius: 0; }
 }
