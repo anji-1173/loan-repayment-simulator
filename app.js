@@ -52,12 +52,14 @@
   }
 
   // n回目の返済年月（開始年月が入力されている場合）
-  function paymentDate(no) {
+  function paymentDate(no, short) {
     var v = startMonthInput.value;
     if (!v) return '';
     var parts = v.split('-');
     var idx = parseInt(parts[0], 10) * 12 + (parseInt(parts[1], 10) - 1) + (no - 1);
-    return Math.floor(idx / 12) + '年' + (idx % 12 + 1) + '月';
+    var y = Math.floor(idx / 12);
+    var m = idx % 12 + 1;
+    return short ? y + '/' + m : y + '年' + m + '月';
   }
 
   function whenLabel(no) {
@@ -200,22 +202,59 @@
     });
     if (periods.length < 2) return;
 
-    var html = '<h3>金利期間ごとの内訳</h3><div class="table-wrap"><table><thead><tr>' +
-      '<th>期間</th><th>金利</th><th>期間初回の返済額</th><th>支払額</th><th>うち元金</th><th>うち利息</th>' +
-      '</tr></thead><tbody>';
-    periods.forEach(function (p) {
-      html += '<tr><td>' + p.from + '〜' + p.to + '回目</td><td>' + pct(p.rate) + '</td><td>' +
-        yen(p.firstPayment) + '</td><td>' + yen(p.payment) + '</td><td>' + yen(p.principal) + '</td><td>' +
-        yen(p.interest) + '</td></tr>';
+    var h3 = document.createElement('h3');
+    h3.textContent = '金利期間ごとの内訳';
+    var wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    var table = document.createElement('table');
+    wrap.appendChild(table);
+    container.appendChild(h3);
+    container.appendChild(wrap);
+
+    // スマホでは「期間＋金利」「元金・利息」をまとめて4列にする
+    renderTable(table, {
+      cols: [
+        { label: '期間', sub: '金利' },
+        { label: '金利', only: 'wide' },
+        { label: '初回返済額' },
+        { label: '支払額' },
+        { label: 'うち元金', only: 'wide' },
+        { label: 'うち利息', only: 'wide' },
+        { label: '元金／利息', only: 'narrow' }
+      ],
+      body: periods.map(function (p) {
+        return {
+          cells: [
+            { main: p.from + '〜' + p.to + '回目', sub: [pct(p.rate)] },
+            pct(p.rate),
+            p.firstPayment,
+            p.payment,
+            p.principal,
+            p.interest,
+            breakdown(p.principal, p.interest)
+          ]
+        };
+      })
     });
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
   }
 
   function currentView() {
     return form.ownerDocument.querySelector('input[name="view"]:checked').value;
   }
 
+  // 元金・利息を1セルに2段で表示（スマホ用）
+  function breakdown(principal, interest) {
+    return { lines: ['元 ' + yenFmt.format(principal), '利 ' + yenFmt.format(interest)] };
+  }
+
+  /**
+   * 表の定義
+   * cols: { label, sub?, only?: 'wide' | 'narrow' }
+   *   only: 'wide'   … PC幅のみ表示（CSVにも出力）
+   *   only: 'narrow' … スマホ幅のみ表示（CSVには出力しない）
+   *   sub            … スマホ幅で見出しの下に小さく出す補足
+   * cells: 数値 | 文字列 | { main, sub: [...] }（sub はスマホ幅のみ） | { lines: [...] }
+   */
   function tableData() {
     if (!lastResult) return null;
     var rows = lastResult.result.rows;
@@ -223,33 +262,103 @@
     var hasDate = !!startMonthInput.value;
     if (currentView() === 'yearly') {
       return {
-        head: ['年目', '返済回', '支払額', '元金', '利息', '年末残高'],
+        cols: [
+          { label: '年目', sub: '返済回' },
+          { label: '返済回', only: 'wide' },
+          { label: '支払額' },
+          { label: '元金', only: 'wide' },
+          { label: '利息', only: 'wide' },
+          { label: '元金／利息', only: 'narrow' },
+          { label: '年末残高' }
+        ],
         body: Loan.summarizeByYear(rows).map(function (y) {
-          return { cells: [y.year + '年目', y.fromNo + '〜' + y.toNo + '回', y.payment, y.principal, y.interest, y.balance] };
+          var range = y.fromNo + '〜' + y.toNo + '回';
+          return {
+            cells: [
+              { main: y.year + '年目', sub: [range] },
+              range, y.payment, y.principal, y.interest,
+              breakdown(y.principal, y.interest),
+              y.balance
+            ]
+          };
         }),
-        foot: ['合計', '', t.payment, t.principal, t.interest, '']
+        foot: ['合計', '', t.payment, t.principal, t.interest, breakdown(t.principal, t.interest), '']
       };
     }
-    var head = ['回'].concat(hasDate ? ['年月'] : [], ['金利', '返済額', '元金', '利息', '残高']);
+    var cols = [{ label: '回', sub: hasDate ? '年月・金利' : '金利' }]
+      .concat(hasDate ? [{ label: '年月', only: 'wide' }] : [])
+      .concat([
+        { label: '金利', only: 'wide' },
+        { label: '返済額' },
+        { label: '元金', only: 'wide' },
+        { label: '利息', only: 'wide' },
+        { label: '元金／利息', only: 'narrow' },
+        { label: '残高' }
+      ]);
     return {
-      head: head,
+      cols: cols,
       body: rows.map(function (r) {
+        var date = hasDate ? paymentDate(r.no) : '';
         return {
           mark: r.rateChanged,
-          cells: [r.no].concat(hasDate ? [paymentDate(r.no)] : [], [pct(r.rate), r.payment, r.principal, r.interest, r.balance])
+          cells: [{ main: r.no, sub: (hasDate ? [paymentDate(r.no, true)] : []).concat([pct(r.rate)]) }]
+            .concat(hasDate ? [date] : [])
+            .concat([pct(r.rate), r.payment, r.principal, r.interest, breakdown(r.principal, r.interest), r.balance])
         };
       }),
-      foot: ['合計'].concat(hasDate ? [''] : [], ['', t.payment, t.principal, t.interest, ''])
+      foot: ['合計'].concat(hasDate ? [''] : [], ['', t.payment, t.principal, t.interest, breakdown(t.principal, t.interest), ''])
     };
   }
 
-  function cellText(v) { return typeof v === 'number' ? yenFmt.format(v) : v; }
+  function cellText(v) { return typeof v === 'number' ? yenFmt.format(v) : String(v); }
 
-  function renderSchedule() {
-    var data = tableData();
-    if (!data) return;
-    var table = $('schedule');
-    table.querySelector('thead').innerHTML = '<tr>' + data.head.map(function (h) { return '<th scope="col">' + h + '</th>'; }).join('') + '</tr>';
+  // CSV 用のプレーンな値
+  function cellPlain(v) {
+    if (v && typeof v === 'object') return v.lines ? v.lines.join(' ') : cellText(v.main);
+    return cellText(v);
+  }
+
+  function onlyClass(col) {
+    return col.only === 'wide' ? 'wide-only' : col.only === 'narrow' ? 'narrow-only' : '';
+  }
+
+  function fillCell(el, v, col) {
+    var cls = onlyClass(col);
+    if (cls) el.className = cls;
+    if (v && typeof v === 'object') {
+      if (v.lines) {
+        v.lines.forEach(function (line) {
+          var s = document.createElement('span');
+          s.className = 'line';
+          s.textContent = line;
+          el.appendChild(s);
+        });
+        return;
+      }
+      el.appendChild(document.createTextNode(cellText(v.main)));
+      (v.sub || []).forEach(function (line) {
+        var s = document.createElement('span');
+        s.className = 'sub narrow-only';
+        s.textContent = line;
+        el.appendChild(s);
+      });
+      return;
+    }
+    el.textContent = cellText(v);
+  }
+
+  function renderTable(table, data) {
+    table.innerHTML = '';
+    var thead = table.createTHead();
+    var htr = thead.insertRow();
+    data.cols.forEach(function (col) {
+      var th = document.createElement('th');
+      th.scope = 'col';
+      fillCell(th, col.sub ? { main: col.label, sub: [col.sub] } : col.label, col);
+      htr.appendChild(th);
+    });
+
+    var tbody = table.createTBody();
     var frag = document.createDocumentFragment();
     data.body.forEach(function (row) {
       var tr = document.createElement('tr');
@@ -257,18 +366,29 @@
         tr.className = 'rate-changed';
         tr.title = 'この回から金利変更';
       }
-      row.cells.forEach(function (c) {
+      row.cells.forEach(function (c, i) {
         var td = document.createElement('td');
-        td.textContent = cellText(c);
+        fillCell(td, c, data.cols[i]);
         tr.appendChild(td);
       });
       frag.appendChild(tr);
     });
-    var tbody = table.querySelector('tbody');
-    tbody.innerHTML = '';
     tbody.appendChild(frag);
-    var tfoot = table.querySelector('tfoot') || table.appendChild(document.createElement('tfoot'));
-    tfoot.innerHTML = '<tr>' + data.foot.map(function (c) { return '<td>' + cellText(c) + '</td>'; }).join('') + '</tr>';
+
+    if (data.foot) {
+      var ftr = table.createTFoot().insertRow();
+      data.foot.forEach(function (c, i) {
+        var td = document.createElement('td');
+        fillCell(td, c, data.cols[i]);
+        ftr.appendChild(td);
+      });
+    }
+  }
+
+  function renderSchedule() {
+    var data = tableData();
+    if (!data) return;
+    renderTable($('schedule'), data);
   }
 
   function downloadCsv() {
@@ -278,9 +398,14 @@
       var s = String(v);
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
-    var lines = [data.head.map(esc).join(',')];
-    data.body.forEach(function (r) { lines.push(r.cells.map(esc).join(',')); });
-    lines.push(data.foot.map(esc).join(','));
+    // スマホ専用列は除き、PC表示と同じ列で出力
+    var keep = data.cols.map(function (c) { return c.only !== 'narrow'; });
+    var toLine = function (cells) {
+      return cells.filter(function (_, i) { return keep[i]; }).map(function (c) { return esc(cellPlain(c)); }).join(',');
+    };
+    var lines = [toLine(data.cols.map(function (c) { return c.label; }))];
+    data.body.forEach(function (r) { lines.push(toLine(r.cells)); });
+    lines.push(toLine(data.foot));
     // Excel で文字化けしないよう BOM 付き UTF-8
     var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
