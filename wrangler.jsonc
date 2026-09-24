@@ -1,0 +1,8 @@
+// Cloudflare で公開するための設定。リポジトリ直下のファイルをそのまま配信する。
+{
+  "name": "loan-repayment-simulator",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./"
+  }
+}
