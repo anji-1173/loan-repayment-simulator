@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <meta name="apple-mobile-web-app-title" content="返済シミュ">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header class="site-header">
@@ -151,6 +151,19 @@
         </div>
       </div>
     </section>
+
+    <section class="card transfer">
+      <h2>データの引っ越し</h2>
+      <p class="hint">保存したシミュレーションを、新しいURLや別の端末へ移せます。<br>① 移す前のアプリで「引っ越しコードをコピー」を押す<br>② 移した先のアプリで、下の欄に貼り付けて「取り込む」を押す</p>
+      <div class="transfer-actions">
+        <button type="button" id="transfer-copy" class="secondary">引っ越しコードをコピー</button>
+      </div>
+      <textarea id="transfer-code" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ここに引っ越しコードを貼り付け" aria-label="引っ越しコード"></textarea>
+      <div class="transfer-actions">
+        <button type="button" id="transfer-import" class="secondary">取り込む</button>
+      </div>
+      <p class="hint" id="transfer-msg" role="status"></p>
+    </section>
   </main>
 
   <footer class="site-footer">
@@ -172,7 +185,7 @@
     </li>
   </template>
 
-  <script src="loan.js?v=5"></script>
-  <script src="app.js?v=5"></script>
+  <script src="loan.js?v=6"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

@@ -690,6 +690,100 @@
     saveState();
   }
 
+  // ---- データの引っ越し（保存一覧をコードにしてコピー → 別のURL・端末で貼り付けて取り込む） ----
+  var TRANSFER_PREFIX = 'LRS1:';
+
+  function utf8ToBase64(str) {
+    var bytes = new TextEncoder().encode(str);
+    var bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function base64ToUtf8(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  function makeTransferCode(list) {
+    return TRANSFER_PREFIX + utf8ToBase64(JSON.stringify({ saved: list }));
+  }
+
+  // 壊れた・別アプリのコードは null。保存1件ごとに形を確かめ、使える分だけ返す
+  function readTransferCode(text) {
+    var code = String(text || '').replace(/\s+/g, '');
+    if (code.indexOf(TRANSFER_PREFIX) !== 0) return null;
+    try {
+      var data = JSON.parse(base64ToUtf8(code.slice(TRANSFER_PREFIX.length)));
+      if (!data || !Array.isArray(data.saved)) return null;
+      return data.saved.filter(function (x) {
+        return x && typeof x.id === 'string' && x.state && typeof x.state === 'object';
+      }).map(function (x) {
+        return {
+          id: x.id,
+          name: String(x.name || '保存').slice(0, 30),
+          savedAt: typeof x.savedAt === 'number' ? x.savedAt : Date.now(),
+          state: x.state
+        };
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function copyTransferCode() {
+    var msg = $('transfer-msg');
+    var list = loadSavedList();
+    if (!list.length) {
+      msg.textContent = '保存したシミュレーションがありません。';
+      return;
+    }
+    var code = makeTransferCode(list);
+    var box = $('transfer-code');
+    var done = function () {
+      msg.textContent = list.length + '件分の引っ越しコードをコピーしました。移した先のアプリで貼り付けてください。';
+    };
+    // コピーできない環境では、欄にコードを出して長押しでコピーしてもらう
+    var fallback = function () {
+      box.value = code;
+      box.focus();
+      box.select();
+      msg.textContent = '自動でコピーできませんでした。上の欄のコードを長押しして、すべて選択 → コピーしてください。';
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function importTransferCode() {
+    var msg = $('transfer-msg');
+    var incoming = readTransferCode($('transfer-code').value);
+    if (!incoming) {
+      msg.textContent = '引っ越しコードを読み取れませんでした。コードを全部貼り付けたか確認してください。';
+      return;
+    }
+    var list = loadSavedList();
+    var have = {};
+    list.forEach(function (x) { have[x.id] = true; });
+    var added = incoming.filter(function (x) { return !have[x.id]; });
+    if (!added.length) {
+      msg.textContent = 'このコードの保存は、すでにすべて取り込まれています。';
+      return;
+    }
+    var merged = list.concat(added).sort(function (a, b) { return b.savedAt - a.savedAt; });
+    if (!storageSet(SAVED_KEY, merged)) {
+      msg.textContent = 'この端末では保存できませんでした（プライベートブラウズ等）。';
+      return;
+    }
+    $('transfer-code').value = '';
+    msg.textContent = added.length + '件を取り込みました。画面上部の一覧から開けます。';
+    renderSavedList();
+    $('saved-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // ---- イベント ----
   principalInput.addEventListener('input', updatePrincipalHint);
   principalInput.addEventListener('blur', function () {
@@ -748,6 +842,8 @@
     if (confirm('入力した条件をすべてクリアします。よろしいですか？\n（保存したシミュレーションは消えません）')) clearInputs();
   });
   $('download-csv').addEventListener('click', downloadCsv);
+  $('transfer-copy').addEventListener('click', copyTransferCode);
+  $('transfer-import').addEventListener('click', importTransferCode);
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();

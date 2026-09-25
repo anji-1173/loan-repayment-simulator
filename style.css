@@ -249,3 +249,21 @@ tr.rate-changed .sub:last-child { color: var(--interest); font-weight: 700; }
   .result .table-wrap { border-left: 0; border-right: 0; border-radius: 0; }
 }
 
+
+/* データの引っ越し */
+.transfer textarea {
+  font: 0.8rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 12px;
+  resize: vertical;
+  word-break: break-all;
+}
+.transfer textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.transfer-actions { margin-top: 12px; }
+.transfer-actions button { font-weight: 700; padding: 8px 18px; }
