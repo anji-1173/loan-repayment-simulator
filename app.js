@@ -711,12 +711,18 @@
   }
 
   // 壊れた・別アプリのコードは null。保存1件ごとに形を確かめ、使える分だけ返す
+  // スマホのコピー・貼り付けやメモアプリ経由で混ざりがちな、全角文字・見えない文字・前後の文章・改行があっても読めるようにする。
+  // 戻り値: 保存の配列 / 'notfound'（コードが見当たらない）/ 'broken'（途中で切れている等）
   function readTransferCode(text) {
-    var code = String(text || '').replace(/\s+/g, '');
-    if (code.indexOf(TRANSFER_PREFIX) !== 0) return null;
+    var s = String(text || '');
+    if (s.normalize) s = s.normalize('NFKC');
+    s = s.replace(/[​-‍⁠﻿]/g, '');
+    var at = s.indexOf(TRANSFER_PREFIX);
+    if (at < 0) return 'notfound';
+    var b64 = s.slice(at + TRANSFER_PREFIX.length).replace(/[^A-Za-z0-9+/=]/g, '');
     try {
-      var data = JSON.parse(base64ToUtf8(code.slice(TRANSFER_PREFIX.length)));
-      if (!data || !Array.isArray(data.saved)) return null;
+      var data = JSON.parse(base64ToUtf8(b64));
+      if (!data || !Array.isArray(data.saved)) return 'broken';
       return data.saved.filter(function (x) {
         return x && typeof x.id === 'string' && x.state && typeof x.state === 'object';
       }).map(function (x) {
@@ -728,7 +734,7 @@
         };
       });
     } catch (e) {
-      return null;
+      return 'broken';
     }
   }
 
@@ -741,12 +747,12 @@
     }
     var code = makeTransferCode(list);
     var box = $('transfer-code');
+    // 自動コピーが黙って失敗する端末もあるので、コードは欄にも必ず出しておく
+    box.value = code;
     var done = function () {
-      msg.textContent = list.length + '件分の引っ越しコードをコピーしました。移した先のアプリで貼り付けてください。';
+      msg.textContent = list.length + '件分の引っ越しコード（' + code.length + '文字）をコピーしました。移した先のアプリで貼り付けてください。';
     };
-    // コピーできない環境では、欄にコードを出して長押しでコピーしてもらう
     var fallback = function () {
-      box.value = code;
       box.focus();
       box.select();
       msg.textContent = '自動でコピーできませんでした。上の欄のコードを長押しして、すべて選択 → コピーしてください。';
@@ -760,9 +766,14 @@
 
   function importTransferCode() {
     var msg = $('transfer-msg');
-    var incoming = readTransferCode($('transfer-code').value);
-    if (!incoming) {
-      msg.textContent = '引っ越しコードを読み取れませんでした。コードを全部貼り付けたか確認してください。';
+    var pasted = $('transfer-code').value;
+    var incoming = readTransferCode(pasted);
+    if (incoming === 'notfound') {
+      msg.textContent = '引っ越しコードが見つかりません（コードは「LRS1:」で始まります）。移す前のアプリで、もう一度「引っ越しコードをコピー」を押してから貼り付けてください。';
+      return;
+    }
+    if (incoming === 'broken') {
+      msg.textContent = '引っ越しコードが途中で切れているようです（貼り付けたのは' + pasted.replace(/\s+/g, '').length + '文字）。移す前のアプリで表示された文字数と比べて、全部貼り付けてください。';
       return;
     }
     var list = loadSavedList();
