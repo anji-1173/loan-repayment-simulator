@@ -717,7 +717,8 @@
     var s = String(text || '');
     if (s.normalize) s = s.normalize('NFKC');
     s = s.replace(/[​-‍⁠﻿]/g, '');
-    var at = s.indexOf(TRANSFER_PREFIX);
+    // iPhoneは貼り付け時に先頭の「LRS」を小文字にすることがあるため、先頭の目印だけは大文字小文字を区別しない
+    var at = s.search(/LRS1:/i);
     if (at < 0) return 'notfound';
     var b64 = s.slice(at + TRANSFER_PREFIX.length).replace(/[^A-Za-z0-9+/=]/g, '');
     try {
