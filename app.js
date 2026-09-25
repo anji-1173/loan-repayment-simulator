@@ -764,12 +764,33 @@
     }
   }
 
+  // コピーしたコードを読み取って欄に入れ、そのまま取り込む（長押しペーストが苦手な端末向け）
+  function pasteAndImportTransferCode() {
+    var msg = $('transfer-msg');
+    var manual = function () {
+      msg.textContent = '自動で貼り付けできませんでした。欄を長押しして「ペースト」してから、「取り込む」を押してください。';
+      $('transfer-code').focus();
+    };
+    if (!navigator.clipboard || !navigator.clipboard.readText) { manual(); return; }
+    navigator.clipboard.readText().then(function (text) {
+      $('transfer-code').value = text || '';
+      importTransferCode();
+    }, manual);
+  }
+
   function importTransferCode() {
     var msg = $('transfer-msg');
     var pasted = $('transfer-code').value;
+    if (!pasted.trim()) {
+      msg.textContent = '欄が空です。欄を長押しして「ペースト」してから、「取り込む」を押してください。';
+      return;
+    }
     var incoming = readTransferCode(pasted);
     if (incoming === 'notfound') {
-      msg.textContent = '引っ越しコードが見つかりません（コードは「LRS1:」で始まります）。移す前のアプリで、もう一度「引っ越しコードをコピー」を押してから貼り付けてください。';
+      var flat = pasted.replace(/\s+/g, ' ').trim();
+      msg.textContent = '引っ越しコードが見つかりません（コードは「LRS1:」で始まります）。欄に入っているのは「' +
+        flat.slice(0, 12) + (flat.length > 12 ? '…' : '') + '」（' + flat.length + '文字）でした。' +
+        '移す前のアプリで、もう一度「引っ越しコードをコピー」を押してから貼り付けてください。';
       return;
     }
     if (incoming === 'broken') {
@@ -855,6 +876,7 @@
   $('download-csv').addEventListener('click', downloadCsv);
   $('transfer-copy').addEventListener('click', copyTransferCode);
   $('transfer-import').addEventListener('click', importTransferCode);
+  $('transfer-paste-import').addEventListener('click', pasteAndImportTransferCode);
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
