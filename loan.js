@@ -2,7 +2,7 @@
  * 返済シミュレーション計算ロジック
  *
  * - 金額はすべて「円」の整数で扱う（10億円でも Number の安全整数範囲内）
- * - 月利 = 年利 × 0.08333333（1/12 を小数第8位までにした値）、毎月の利息 = 残高 × 月利（1円未満切り捨て）
+ * - 月利 = 年利 ÷ 12（小数第10位未満切り捨て）、毎月の利息 = 残高 × 月利（1円未満切り捨て）
  * - 元利均等返済：金利が変わった月に「残高・残り回数・新金利」で毎月返済額を再計算
  * - 元金均等返済：毎月の元金は一定、利息だけが残高と金利に応じて変わる
  * - 端数は最終回で精算する
@@ -17,13 +17,12 @@
   var MAX_MONTHS = 600;            // 50年
   var MAX_RATE = 30;               // 年30%
 
-  // 月利 = 年利 × 0.08333333（1/12 を小数第8位までにした値。銀行の返済予定表に合わせた計算）
-  // 年利は0.001%単位で扱い、月利×10^13 を整数で持つ（例：1.6% → 1,600 × 8,333,333）
-  var ONE_TWELFTH = 8333333;        // 0.08333333 × 10^8
-  var MONTHLY_RATE_SCALE = 1e13;    // 0.001%単位(10^5) × 10^8
+  // 月利 = 年利 ÷ 12 を小数第10位未満切り捨て（銀行の返済予定表に合わせた端数処理）
+  // 年利は0.001%単位で扱い、月利×10^10 を整数で持つ（例：1.6% → 13,333,333）
+  var MONTHLY_RATE_SCALE = 1e10;
   function monthlyRateScaled(annualRatePercent) {
     var milli = Math.round(annualRatePercent * 1000); // 0.001%単位
-    return milli * ONE_TWELFTH;
+    return Math.floor(milli * 25000 / 3);             // = milli / 1000 / 100 / 12 × 10^10
   }
   function monthlyRate(annualRatePercent) {
     return monthlyRateScaled(annualRatePercent) / MONTHLY_RATE_SCALE;
