@@ -19,7 +19,8 @@ test('元利均等：3,000万円 / 35年 / 0.5%', () => {
   checkConsistency(r, 30000000);
   // 一般的なシミュレーターの値（77,875円）と一致
   assert.equal(r.rows[0].payment, 77875);
-  assert.equal(r.rows[0].interest, 12500);
+  // 月利（0.5%÷12）は小数第10位未満切り捨てのため、割り切れる 12,500円 は 12,499円 になる
+  assert.equal(r.rows[0].interest, 12499);
   const payments = new Set(r.rows.slice(0, -1).map((x) => x.payment));
   assert.equal(payments.size, 1, '最終回以外は毎月同額');
 });
@@ -28,7 +29,7 @@ test('元金均等：3,000万円 / 35年 / 1%', () => {
   const r = Loan.simulate({ principal: 30000000, months: 420, baseRate: 1, method: 'equal-principal' });
   checkConsistency(r, 30000000);
   assert.equal(r.rows[0].principal, 71428);
-  assert.equal(r.rows[0].interest, 25000);
+  assert.equal(r.rows[0].interest, 24999);
   assert.ok(r.rows[1].payment < r.rows[0].payment, '返済額は減っていく');
 });
 
@@ -96,6 +97,10 @@ test('鹿児島銀行の返済予定表と一致：2.58億円 / 30年 / 1.6% →
   checkConsistency(r, 258000000);
   assert.equal(r.rows[0].payment, 902842);
   assert.equal(r.rows[6].payment, 933897);
-  assert.equal(r.rows[8].balance, 253009241);
+  assert.equal(r.rows[0].interest, 343999);
+  assert.equal(r.rows[8].balance, 253009240);
   assert.equal(r.rows[9].payment, 965340);
+  assert.equal(r.rows[9].principal, 522574);
+  assert.equal(r.rows[9].interest, 442766);
+  assert.equal(r.rows[9].balance, 252486666);
 });
