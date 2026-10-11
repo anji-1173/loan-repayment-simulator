@@ -87,3 +87,15 @@ test('入力チェック', () => {
   assert.equal(Loan.validate({ principal: 1e9, months: 420, baseRate: 1, method: 'equal-principal' }).length, 0);
   assert.throws(() => Loan.simulate({ principal: -1, months: 12, baseRate: 1, method: 'equal-payment' }));
 });
+
+test('鹿児島銀行の返済予定表と一致：2.58億円 / 30年 / 1.6% → 7回目1.85% → 10回目2.1%', () => {
+  const r = Loan.simulate({
+    principal: 258000000, months: 360, baseRate: 1.6, method: 'equal-payment',
+    rateChanges: [{ month: 7, rate: 1.85 }, { month: 10, rate: 2.1 }]
+  });
+  checkConsistency(r, 258000000);
+  assert.equal(r.rows[0].payment, 902842);
+  assert.equal(r.rows[6].payment, 933897);
+  assert.equal(r.rows[8].balance, 253009241);
+  assert.equal(r.rows[9].payment, 965340);
+});

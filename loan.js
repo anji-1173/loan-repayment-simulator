@@ -21,13 +21,16 @@
     return Math.floor(balance * annualRatePercent / 100 / 12);
   }
 
-  // 元利均等の毎月返済額（1円未満切り捨て、差額は最終回で精算）
+  // 元利均等の毎月返済額 = 残高 × 月利 ÷ (1 − (1+月利)^−回数)
+  // 銀行の返済予定表に合わせ、(1+月利)^−回数 は小数第7位未満を切り捨て、返済額は1円未満切り捨て
+  // （差額は最終回で精算）
+  var DISCOUNT_SCALE = 1e7;
   function annuityPayment(balance, annualRatePercent, remainingMonths) {
     if (remainingMonths <= 0) return balance;
     var r = annualRatePercent / 100 / 12;
     if (r === 0) return Math.floor(balance / remainingMonths);
-    var pow = Math.pow(1 + r, remainingMonths);
-    return Math.floor(balance * r * pow / (pow - 1));
+    var discount = Math.floor(Math.pow(1 + r, -remainingMonths) * DISCOUNT_SCALE) / DISCOUNT_SCALE;
+    return Math.floor(balance * r / (1 - discount));
   }
 
   // 金利変更を「開始回 → 年利」のマップに正規化（1回目は基本金利）
