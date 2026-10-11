@@ -19,7 +19,7 @@ test('元利均等：3,000万円 / 35年 / 0.5%', () => {
   checkConsistency(r, 30000000);
   // 一般的なシミュレーターの値（77,875円）と一致
   assert.equal(r.rows[0].payment, 77875);
-  // 月利（0.5%÷12）は小数第10位未満切り捨てのため、割り切れる 12,500円 は 12,499円 になる
+  // 月利は 年利 × 0.08333333 のため、割り切れる 12,500円 は 12,499円 になる
   assert.equal(r.rows[0].interest, 12499);
   const payments = new Set(r.rows.slice(0, -1).map((x) => x.payment));
   assert.equal(payments.size, 1, '最終回以外は毎月同額');
@@ -103,4 +103,6 @@ test('鹿児島銀行の返済予定表と一致：2.58億円 / 30年 / 1.6% →
   assert.equal(r.rows[9].principal, 522574);
   assert.equal(r.rows[9].interest, 442766);
   assert.equal(r.rows[9].balance, 252486666);
+  assert.equal(r.rows[26].interest, 426999);
+  assert.equal(r.rows[31].balance, 240755800);
 });

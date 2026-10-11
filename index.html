@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <meta name="apple-mobile-web-app-title" content="返済シミュ">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header class="site-header">
@@ -168,7 +168,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>利息は「残高 × 月利（年利 ÷ 12、小数第10位未満切り捨て）」を1円未満切り捨てで計算しています。実際の返済額は金融機関の計算方法（端数処理、5年ルール・125%ルール等）により異なる場合があります。</p>
+    <p>利息は「残高 × 月利（年利 × 0.08333333）」を1円未満切り捨てで計算しています。実際の返済額は金融機関の計算方法（端数処理、5年ルール・125%ルール等）により異なる場合があります。</p>
   </footer>
 
   <template id="rate-change-template">
@@ -186,7 +186,7 @@
     </li>
   </template>
 
-  <script src="loan.js?v=11"></script>
-  <script src="app.js?v=11"></script>
+  <script src="loan.js?v=12"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
